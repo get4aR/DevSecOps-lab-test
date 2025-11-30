@@ -83,7 +83,7 @@ jobs:
       - name: Run Trivy on backend
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'backend'
+          image-ref: 'devsecops-lab-test-backend'
           format: 'json'
           output: 'trivy-report.json'
           severity: 'CRITICAL,HIGH'
