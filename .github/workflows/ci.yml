@@ -11,11 +11,10 @@ on:
 jobs:
   lint-and-tests-jobuh:
     runs-on: ubuntu-latest
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-        
+      
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
@@ -36,7 +35,6 @@ jobs:
     
   hadolint-jobuh:
     runs-on: ubuntu-latest
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -54,6 +52,18 @@ jobs:
         dockerfile: nginx/Dockerfile
         format: json
         output-file: hadolint-nginx-report.json
+
+    - name: Show Hadolint Backend Report
+      run: |
+        echo "=== HADOLINT BACKEND ==="
+        cat hadolint-backend-report.json | jq '.'
+        echo ""
+    
+    - name: Show Hadolint Nginx Report
+      run: |
+        echo "=== HADOLINT NGINX ==="
+        cat hadolint-nginx-report.json | jq '.'
+        echo ""
 
   trivy-jobuh:
     runs-on: ubuntu-latest
@@ -89,11 +99,9 @@ jobs:
           severity: 'CRITICAL,HIGH'
           exit-code: '0'
 
-      - name: Upload Trivy report
-        uses: actions/upload-artifact@v4
-        with:
-          name: trivy-report
-          path: trivy-report.json
+      - name: Show Trivy Report
+        run: |
+          cat trivy-report.json
 
       - name: Start stack
         run: |
