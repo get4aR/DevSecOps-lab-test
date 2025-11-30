@@ -188,7 +188,7 @@ def healthcheck(db: Session = Depends(get_db)):
         db_status = "ok"
     except Exception:
         db_status = "error"
-    
+
     return {
         "status": "healthy" if db_status == "ok" else "unhealthy",
         "database": db_status,
