@@ -1,5 +1,5 @@
 # Этап настройка и создания Nginx
-FROM nginx:latest
+FROM nginx:1.25-alpine
 
 # Копируем конфигурацию
 COPY nginx.conf /etc/nginx/nginx.conf
