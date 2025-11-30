@@ -174,3 +174,41 @@ jobs:
       with:
         name: bandit-report
         path: bandit-report.json
+
+  summary-report-jobuh:
+    runs-on: ubuntu-latest
+    needs: [ruff-jobuh, bandit-jobuh, hadolint-jobuh, trivy-jobuh]
+    if: always()
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: reports
+
+      - name: Install jq
+        run: sudo apt-get update -y && sudo apt-get install -y jq
+
+      - name: Build short Markdown report
+        run: |
+          # Безопасные значения по умолчанию
+          RUFF_TOTAL=$(jq 'length' reports/ruff-report/ruff-report.json 2>/dev/null || echo 0)
+          BANDIT_TOTAL=$(jq '.results | length' reports/bandit-report/bandit-report.json 2>/dev/null || echo 0)
+          BANDIT_HIGH=$(jq '[.results[] | select(.issue_severity=="HIGH")] | length' reports/bandit-report/bandit-report.json 2>/dev/null || echo 0)
+          HADOLINT_BACKEND=$(jq 'length' reports/hadolint-backend-report.json 2>/dev/null || echo 0)
+          HADOLINT_NGINX=$(jq 'length' reports/hadolint-nginx-report.json 2>/dev/null || echo 0)
+          TRIVY_TOTAL=$(jq '.Results[0].Vulnerabilities | length' reports/trivy-report.json 2>/dev/null || echo 0)
+          TRIVY_CRIT=$(jq '[.Results[0].Vulnerabilities[] | select(.Severity=="CRITICAL")] | length' reports/trivy-report.json 2>/dev/null || echo 0)
+          TRIVY_HIGH=$(jq '[.Results[0].Vulnerabilities[] | select(.Severity=="HIGH")] | length' reports/trivy-report.json 2>/dev/null || echo 0)
+
+          cat > security-summary.md <<EOF
+
+      - name: Upload summary as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: devsecops-summary
+          path: security-summary.md
+
+      - name: Attach to job summary
+        run: |
+          echo "## DevSecOps краткий отчёт" >> "$GITHUB_STEP_SUMMARY"
+          cat security-summary.md >> "$GITHUB_STEP_SUMMARY"
