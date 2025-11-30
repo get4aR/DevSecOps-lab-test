@@ -34,4 +34,98 @@ jobs:
       run: |
         python -m pytest tests.py -v
     
+  hadolint-jobuh:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
     
+    - name: Run Hadolint Backend
+      uses: hadolint/hadolint-action@v3.1.0
+      with:
+        dockerfile: backend/Dockerfile
+        format: json
+        output-file: hadolint-backend-report.json
+    
+    - name: Run Hadolint Nginx
+      uses: hadolint/hadolint-action@v3.1.0
+      with:
+        dockerfile: nginx/Dockerfile
+        format: json
+        output-file: hadolint-nginx-report.json
+
+  trivy-jobuh:
+    runs-on: ubuntu-latest
+    
+    services:
+      db:
+        image: postgres:17
+        env:
+          POSTGRES_USER: dbuser
+          POSTGRES_PASSWORD: dbpassword
+          POSTGRES_DB: db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dbuser -d db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build images
+        run: docker compose build
+
+      - name: Run Trivy on backend
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'backend'
+          format: 'json'
+          output: 'trivy-report.json'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'
+
+      - name: Upload Trivy report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-report.json
+
+      - name: Start stack
+        run: |
+          docker compose up -d
+          
+          timeout=120
+          while [ $timeout -gt 0 ]; do
+            if curl -fsS http://localhost:80/ > /dev/null 2>&1; then
+              echo "START SUCCESS"
+              break
+            fi
+            sleep 1
+            timeout=$((timeout - 1))
+          done
+          
+          if [ $timeout -eq 0 ]; then
+            echo "START FAILED"
+            docker compose logs backend
+            exit 1
+          fi
+
+      - name: Verify HTTP 200
+        run: |
+          status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:80/healthcheck)
+          echo "Healthcheck status: $status"
+          if [ "$status" != "200" ]; then
+            echo "Expected 200, got $status"
+            docker compose logs backend
+            exit 1
+          fi
+          echo "Healthy oh yeah"
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v
