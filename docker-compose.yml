@@ -1,0 +1,51 @@
+services:
+  db:
+    image: postgres:17
+    container_name: db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: dbuser
+      POSTGRES_PASSWORD: dbpassword
+      POSTGRES_DB: db
+    volumes:
+      - ./db/dump:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - app_network
+    restart: on-failure # Политика перезапуска для базы данных
+
+  backend:
+    build:
+      context: ./backend
+    container_name: backend
+    ports:
+     - "8000:8000"
+    networks:
+      - app_network
+    environment:
+      DATABASE_URL: "postgresql://dbuser:dbpassword@db:5432/db"
+    depends_on:
+      - db
+    restart: on-failure # Политика перезапуска для веб-сайта
+
+  nginx:
+    build: ./nginx
+    container_name: nginx
+    ports:
+      - "80:80"
+    networks:
+      - app_network
+    depends_on:
+      - backend
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+    restart: on-failure # Политика перезапуска для Nginx
+
+networks:
+  app_network:
+    driver: bridge
+
+volumes:
+  dump:
+    external: false

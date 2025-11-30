@@ -1,0 +1,37 @@
+name: lab4-workflow
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    - cron: '0 9 * * 5'  # Каждую пятницу, 9:00 UTC
+
+jobs:
+  lint-and-tests-jobuh:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+        
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13.7'
+
+    - name: Install requirements such as flake8, pytest, ruff, bandit
+      run: |
+        pip install flake8 pytest ruff bandit
+        if [ -f backend/requirements.txt ]; then pip install -r backend/requirements.txt; fi
+
+    - name: Run flake8
+      run: |
+        flake8 ./backend --count --max-line-length=127
+
+    - name: Run tests
+      run: |
+        python -m pytest tests.py -v
+    
+    
