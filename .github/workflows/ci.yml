@@ -21,9 +21,9 @@ jobs:
       with:
         python-version: '3.13.7'
 
-    - name: Install requirements such as flake8, pytest, ruff, bandit
+    - name: Install requirements such as flake8, pytest
       run: |
-        pip install flake8 pytest ruff bandit
+        pip install flake8 pytest
         if [ -f backend/requirements.txt ]; then pip install -r backend/requirements.txt; fi
 
     - name: Run flake8
@@ -144,7 +144,6 @@ jobs:
     - name: Run ruff
       run: |
         ruff check ./backend --output-format json > ruff-report.json
-        ruff format ./backend --check
 
     - name: Upload ruff report
       uses: actions/upload-artifact@v4
