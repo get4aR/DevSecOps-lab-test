@@ -47,6 +47,12 @@ jobs:
         dockerfile: backend/Dockerfile
         format: json
         output-file: hadolint-backend-report.json
+
+    - name: Upload hadolint backend report
+      uses: actions/upload-artifact@v4
+      with:
+        name: hadolint-backend-report.json
+        path: hadolint-backend-report.json
     
     - name: Run Hadolint Nginx
       uses: hadolint/hadolint-action@v3.1.0
@@ -54,6 +60,12 @@ jobs:
         dockerfile: nginx/Dockerfile
         format: json
         output-file: hadolint-nginx-report.json
+
+    - name: Upload hadolint nginx report
+      uses: actions/upload-artifact@v4
+      with:
+        name: hadolint-nginx-report.json
+        path: hadolint-nginx-report.json
 
   trivy-jobuh:
     runs-on: ubuntu-latest
@@ -114,3 +126,52 @@ jobs:
       - name: Cleanup
         if: always()
         run: docker compose down -v
+
+  ruff-jobuh:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13.7'
+
+    - name: Install ruff
+      run: pip install ruff
+
+    - name: Run ruff
+      run: |
+        ruff check ./backend --output-format json > ruff-report.json
+        ruff format ./backend --check
+
+    - name: Upload ruff report
+      uses: actions/upload-artifact@v4
+      with:
+        name: ruff-report
+        path: ruff-report.json
+
+  bandit-jobuh:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13.7'
+
+    - name: Install bandit
+      run: pip install bandit
+
+    - name: Run bandit
+      run: |
+        bandit -r ./backend -f json -o bandit-report.json
+
+    - name: Upload bandit report
+      uses: actions/upload-artifact@v4
+      with:
+        name: bandit-report
+        path: bandit-report.json
