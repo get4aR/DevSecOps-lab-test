@@ -175,12 +175,12 @@ jobs:
         name: bandit-report
         path: bandit-report.json
 
-  summary-report-jobuh:
+  summary_report:
+    needs: [lint-and-tests-jobuh, trivy-jobuh, ruff-jobuh, bandit-jobuh, hadolint-jobuh]
     runs-on: ubuntu-latest
-    needs: [ruff-jobuh, bandit-jobuh, hadolint-jobuh, trivy-jobuh]
-    if: always()
+
     steps:
-      - name: Download all artifacts
+      - name: Download reports
         uses: actions/download-artifact@v4
         with:
           path: reports
@@ -188,27 +188,87 @@ jobs:
       - name: Install jq
         run: sudo apt-get update -y && sudo apt-get install -y jq
 
-      - name: Build short Markdown report
+      - name: Create summary report
         run: |
-          # Безопасные значения по умолчанию
-          RUFF_TOTAL=$(jq 'length' reports/ruff-report/ruff-report.json 2>/dev/null || echo 0)
-          BANDIT_TOTAL=$(jq '.results | length' reports/bandit-report/bandit-report.json 2>/dev/null || echo 0)
-          BANDIT_HIGH=$(jq '[.results[] | select(.issue_severity=="HIGH")] | length' reports/bandit-report/bandit-report.json 2>/dev/null || echo 0)
-          HADOLINT_BACKEND=$(jq 'length' reports/hadolint-backend-report.json 2>/dev/null || echo 0)
-          HADOLINT_NGINX=$(jq 'length' reports/hadolint-nginx-report.json 2>/dev/null || echo 0)
-          TRIVY_TOTAL=$(jq '.Results[0].Vulnerabilities | length' reports/trivy-report.json 2>/dev/null || echo 0)
-          TRIVY_CRIT=$(jq '[.Results[0].Vulnerabilities[] | select(.Severity=="CRITICAL")] | length' reports/trivy-report.json 2>/dev/null || echo 0)
-          TRIVY_HIGH=$(jq '[.Results[0].Vulnerabilities[] | select(.Severity=="HIGH")] | length' reports/trivy-report.json 2>/dev/null || echo 0)
+          REPORT=summary_report.md
+          echo "# Lab 4 summary report" > "$REPORT"
+          echo "" >> "$REPORT"
 
-          cat > security-summary.md <<EOF
+          # ---------- Flake8 / Pytest ----------
+          echo "## Flake8 / Pytest" >> "$REPORT"
+          echo '```
+          if [ -s reports/flake8-report/flake8-report.txt ]; then
+            echo "Flake8: найдены замечания, см. подробный отчет:" >> "$REPORT"
+            cat reports/flake8-report/flake8-report.txt >> "$REPORT"
+          else
+            echo "Flake8: нарушений стиля не обнаружено." >> "$REPORT"
+          fi
+          echo "" >> "$REPORT"
+          if [ -s reports/pytest-report/pytest-report.txt ]; then
+            echo "" >> "$REPORT"
+            echo "Pytest: результаты тестов:" >> "$REPORT"
+            cat reports/pytest-report/pytest-report.txt >> "$REPORT"
+          else
+            echo "Pytest: отчет отсутствует или пуст." >> "$REPORT"
+          fi
+          echo '```' >> "$REPORT"
+          echo "" >> "$REPORT"
 
-      - name: Upload summary as artifact
+          # ---------- Ruff ----------
+          echo "## Ruff (стиль Python)" >> "$REPORT"
+          echo '```
+          if [ -s reports/ruff-report/ruff-report.json ]; then
+            RUFF_TOTAL=$(jq 'length' reports/ruff-report/ruff-report.json 2>/dev/null || echo 0)
+            echo "Всего найдено предупреждений: ${RUFF_TOTAL}." >> "$REPORT"
+            echo "Подробный JSON-отчет см. в артефакте ruff-report." >> "$REPORT"
+          else
+            echo "Ruff: отчет не найден, критичных замечаний нет." >> "$REPORT"
+          fi
+          echo '```' >> "$REPORT"
+          echo "" >> "$REPORT"
+
+          # ---------- Bandit ----------
+          echo "## Bandit (безопасность Python-кода)" >> "$REPORT"
+          echo '```
+          if [ -s reports/bandit-report/bandit-report.json ]; then
+            BANDIT_TOTAL=$(jq '.results | length' reports/bandit-report/bandit-report.json 2>/dev/null || echo 0)
+            BANDIT_HIGH=$(jq '[.results[] | select(.issue_severity=="HIGH")] | length' reports/bandit-report/bandit-report.json 2>/dev/null || echo 0)
+            echo "Всего найдено потенциальных проблем: ${BANDIT_TOTAL}, из них HIGH: ${BANDIT_HIGH}." >> "$REPORT"
+            echo "Детали доступны в JSON-отчете arтефакта bandit-report." >> "$REPORT"
+          else
+            echo "Bandit: отчет отсутствует, проблем не зафиксировано." >> "$REPORT"
+          fi
+          echo '```' >> "$REPORT"
+          echo "" >> "$REPORT"
+
+          # ---------- Hadolint ----------
+          echo "## Hadolint (Dockerfile’ы backend и nginx)" >> "$REPORT"
+          echo '```
+          BACKEND_ISSUES=$(jq 'length' reports/hadolint-backend-report.json 2>/dev/null || echo 0)
+          NGINX_ISSUES=$(jq 'length' reports/hadolint-nginx-report.json 2>/dev/null || echo 0)
+          TOTAL_HADOLINT=$((BACKEND_ISSUES + NGINX_ISSUES))
+          echo "Всего замечаний: ${TOTAL_HADOLINT} (backend: ${BACKEND_ISSUES}, nginx: ${NGINX_ISSUES})." >> "$REPORT"
+          echo "Полные JSON-отчеты: hadolint-backend-report.json и hadolint-nginx-report.json." >> "$REPORT"
+          echo '```' >> "$REPORT"
+          echo "" >> "$REPORT"
+
+          # ---------- Trivy ----------
+          echo "## Trivy (уязвимости контейнерного образа)" >> "$REPORT"
+          echo '```
+          if [ -s reports/trivy-report/trivy-report.json ]; then
+            TRIVY_TOTAL=$(jq '.Results.Vulnerabilities | length' reports/trivy-report/trivy-report.json 2>/dev/null || echo 0)
+            TRIVY_CRIT=$(jq '[.Results.Vulnerabilities[] | select(.Severity=="CRITICAL")] | length' reports/trivy-report/trivy-report.json 2>/dev/null || echo 0)
+            TRIVY_HIGH=$(jq '[.Results.Vulnerabilities[] | select(.Severity=="HIGH")] | length' reports/trivy-report/trivy-report.json 2>/dev/null || echo 0)
+            echo "Всего уязвимостей: ${TRIVY_TOTAL}, CRITICAL: ${TRIVY_CRIT}, HIGH: ${TRIVY_HIGH}." >> "$REPORT"
+            echo "Подробности см. в trivy-report.json." >> "$REPORT"
+          else
+            echo "Trivy: отчет не найден, уязвимости в данном прогоне не зафиксированы." >> "$REPORT"
+          fi
+          echo '```' >> "$REPORT"
+          echo "" >> "$REPORT"
+
+      - name: Upload summary report
         uses: actions/upload-artifact@v4
         with:
-          name: devsecops-summary
-          path: security-summary.md
-
-      - name: Attach to job summary
-        run: |
-          echo "## DevSecOps краткий отчёт" >> "$GITHUB_STEP_SUMMARY"
-          cat security-summary.md >> "$GITHUB_STEP_SUMMARY"
+          name: summary_report
+          path: summary_report.md
